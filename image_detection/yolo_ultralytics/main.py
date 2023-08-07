@@ -1,17 +1,48 @@
-import torch
+from ultralytics import YOLO
+import numpy as np
 import cv2
-from super_gradients.training import models
 
-DEVICE = 'cuda' if torch.cuda.is_available() else 'cpu'
-MODEL_ARCH = 'yolo_nas_s'
+# Load a model
+model = YOLO("best.pt")  # load a pretrained model (recommended for training)
 
-model = models.get(MODEL_ARCH, pretrained_weights="coco").to(DEVICE)
+# results = model.predict('bus.jpg')
 
-CONFIDENCE_TRESHOLD = 0.35
+cap = cv2.VideoCapture(0)
+if not cap.isOpened():
+    print("Cannot open camera")
+    exit()
 
-image = cv2.imread("bus.jpg")
+while True:
+    ret, frame = cap.read()
+    # frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
 
-results = model.predict(image, conf=CONFIDENCE_TRESHOLD)
+    results = model.predict(frame, conf=0.25, classes=0)
 
-for result in results:
-    print(result.prediction)
+    if cv2.waitKey(1) & 0xFF == ord('q'):
+        break
+
+    for result in results:
+        print(result.boxes.conf)
+        print(result.boxes.cls)
+        print(result.boxes.xyxy)
+
+        conf = result.boxes.conf
+        cla = result.boxes.cls
+        xyxy = result.boxes.xyxy
+
+        for i, (c, cl, xy) in enumerate(zip(conf, cla, xyxy)):
+            print("prediction: ", i)
+            print("label_id: ", cl)
+            print("label_name: ", result.names[int(cl)])
+            print("confidence: ", c)
+            print("bbox: ", xy)
+            print("--" * 10)
+
+            cv2.rectangle(frame, (int(xy[0]), int(xy[1])), (int(xy[2]), int(xy[3])), (0, 255, 0), 2)
+            cv2.putText(frame, f"{model.names[int(cl)]} {c}", (int(xy[0]), int(xy[1])), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 255, 0), 2)
+
+        cv2.imshow("frame", frame)
+
+cap.release()
+
+cv2.destroyAllWindows()
